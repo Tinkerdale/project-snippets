@@ -1,134 +1,118 @@
 <?php
+// 'product' object
 class Product{
- 
+
     // database connection and table name
-    private $connect;
-    private $table_name = "products";
- 
+    private $conn;
+    private $table_name="products";
+
     // object properties
     public $id;
     public $name;
     public $price;
     public $description;
     public $category_id;
+    public $category_name;
     public $timestamp;
- 
+
+    // constructor
     public function __construct($db){
-        $this->connect = $db;
+        $this->conn = $db;
     }
- 
-    // create product
-    function create(){
- 
-        //write query
-        $query = "INSERT INTO
-                    " . $this->table_name . "
-                SET
-                    name=:name, price=:price, description=:description, category_id=:category_id, created=:created";
- 
-        $stmt = $this->connect->prepare($query);
- 
-        // posted values
-        $this->name=htmlspecialchars(strip_tags($this->name));
-        $this->price=htmlspecialchars(strip_tags($this->price));
-        $this->description=htmlspecialchars(strip_tags($this->description));
-        $this->category_id=htmlspecialchars(strip_tags($this->category_id));
- 
-        // to get time-stamp for 'created' field
-        $this->timestamp = date('Y-m-d H:i:s');
- 
-        // bind values 
-        $stmt->bindParam(":name", $this->name);
-        $stmt->bindParam(":price", $this->price);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":category_id", $this->category_id);
-        $stmt->bindParam(":created", $this->timestamp);
- 
-        if($stmt->execute()){
-            return true;
-        }else{
-            return false;
-        }
- 
-    }
-    //create  read all code 
-   public function readAll($from_record_num,$records_per_page){
-       $query = " SELECT id ,name,description,price,category_id FROM ".$this->table_name."
-        ORDER BY id ASC LIMIT {$from_record_num},{$records_per_page}";
-        $stmt =$this->connect->prepare($query);
-        $stmt->execute();
-        return $stmt;
-    }
-    // used for paging products
-public function countAll(){
- 
-    $query = "SELECT id FROM " . $this->table_name . "";
- 
-    $stmt = $this->connect->prepare( $query );
-    $stmt->execute();
- 
-    $num = $stmt->rowCount();
- 
-    return $num;
-}
-//reading products
-function readOne(){
- 
+    // read all products
+function read($from_record_num, $records_per_page){
+
+    // select all products query
     $query = "SELECT
-                name, price, description, category_id
+                id, name, description, price
+            FROM
+                " . $this->table_name . "
+            ORDER BY
+                created DESC
+            LIMIT
+                ?, ?";
+
+    // prepare query statement
+    $stmt = $this->conn->prepare( $query );
+
+    // bind limit clause variables
+    $stmt->bindParam(1, $from_record_num, PDO::PARAM_INT);
+    $stmt->bindParam(2, $records_per_page, PDO::PARAM_INT);
+
+    // execute query
+    $stmt->execute();
+
+    // return values
+    return $stmt;
+}
+
+// used for paging products
+public function count(){
+
+    // query to count all product records
+    $query = "SELECT count(*) FROM " . $this->table_name;
+
+    // prepare query statement
+    $stmt = $this->conn->prepare( $query );
+
+    // execute query
+    $stmt->execute();
+
+    // get row value
+    $rows = $stmt->fetch(PDO::FETCH_NUM);
+
+    // return count
+    return $rows[0];
+}
+// read all product based on product ids included in the $ids variable
+// reference http://stackoverflow.com/a/10722827/827418
+public function readByIds($ids){
+
+    $ids_arr = str_repeat('?,', count($ids) - 1) . '?';
+
+    // query to select products
+    $query = "SELECT id, name, price FROM " . $this->table_name . " WHERE id IN ({$ids_arr}) ORDER BY name";
+
+    // prepare query statement
+    $stmt = $this->conn->prepare($query);
+
+    // execute query
+    $stmt->execute($ids);
+
+    // return values from database
+    return $stmt;
+}
+// used when filling up the update product form
+public function readOne(){
+
+    // query to select single record
+    $query = "SELECT
+                name, description, price
             FROM
                 " . $this->table_name . "
             WHERE
                 id = ?
             LIMIT
                 0,1";
- 
-    $stmt = $this->connect->prepare( $query );
-    $stmt->bindParam(1, $this->id);
-    $stmt->execute();
- 
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
- 
-    $this->name = $row['name'];
-    $this->price = $row['price'];
-    $this->description = $row['description'];
-    $this->category_id = $row['category_id'];
-}
-function update(){
- 
-    $query = "UPDATE
-                ". $this->table_name ."
-            SET
-                name = :name,
-                price = :price,
-                description = :description,
-                category_id  = :category_id
-            WHERE
-                id = :id ";
- 
-    $stmt = $this->connect->prepare($query);
- 
-    // posted values
-    $this->name=htmlspecialchars(strip_tags($this->name));
-    $this->price=htmlspecialchars(strip_tags($this->price));
-    $this->description=htmlspecialchars(strip_tags($this->description));
-    $this->category_id=htmlspecialchars(strip_tags($this->category_id));
+
+    // prepare query statement
+    $stmt = $this->conn->prepare( $query );
+
+    // sanitize
     $this->id=htmlspecialchars(strip_tags($this->id));
- 
-    // bind parameters
-    $stmt->bindParam(':name', $this->name);
-    $stmt->bindParam(':price', $this->price);
-    $stmt->bindParam(':description', $this->description);
-    $stmt->bindParam(':category_id', $this->category_id);
-    $stmt->bindParam(':id', $this->id);
- 
-    // execute the query
-    if($stmt->execute()){
-        return true;
-    }
- 
-    return false;
-     
+
+    // bind product id value
+    $stmt->bindParam(1, $this->id);
+
+    // execute query
+    $stmt->execute();
+
+    // get row values
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // assign retrieved row value to object properties
+    $this->name = $row['name'];
+    $this->description = $row['description'];
+    $this->price = $row['price'];
 }
 }
-?>
