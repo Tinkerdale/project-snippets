@@ -1,118 +1,141 @@
 <?php
-// 'product' object
-class Product{
+// include classes
+require_once "config/dbconnection.php";
+require_once "object/product.php";
+require_once "object/product_image.php";
+require_once "object/cart_item.php";
 
-    // database connection and table name
-    private $conn;
-    private $table_name="products";
+// get database connection
+$database = new dbConnect();
+$db = $database->connect();
 
-    // object properties
-    public $id;
-    public $name;
-    public $price;
-    public $description;
-    public $category_id;
-    public $category_name;
-    public $timestamp;
+// initialize objects
+$product = new Product($db);
+$product_image = new ProductImage($db);
+$stmt_product_image=new Product($db);
 
-    // constructor
-    public function __construct($db){
-        $this->conn = $db;
+// get ID of the product to be edited and action
+$id = isset($_GET['id']) ? $_GET['id'] : die('ERROR: missing ID.');
+$action = isset($_GET['action']) ? $_GET['action'] : "";
+
+// set the id as product id property
+$product->id = $id;
+
+// to read single record product
+$product->readOne($db);
+
+// set page title
+$page_title = $product->name;
+$cart_item = new CartItem($db);
+
+// include page header HTML
+require_once 'layout_head.php';
+
+echo "<div class='col-md-12'>";
+   if($action=='added'){
+       echo "<div class='alert alert-info'>";
+           echo "Product was added to your cart!";
+       echo "</div>";
+   }
+
+   else if($action=='unable_to_add'){
+       echo "<div class='alert alert-info'>";
+           echo "Unable to add product to cart. Please contact Admin.";
+       echo "</div>";
+   }
+echo "</div>";
+// content will be here
+// set product id
+$product_image->product_id=$id;
+
+
+// count all relatd product image
+   $num_product_image = $stmt_product_image->count();
+
+  echo "<div class='col-md-4'>";
+    // if count is more than zero
+    if($num_product_image>0){
+        // loop through all product images
+        while ($row = $stmt_product_image->fetch(PDO::FETCH_ASSOC)){
+            // image name and source url
+            $product_image_name = $row['name'];
+            $source="uploads/images/{$product_image_name}";
+            echo "<img src='{$source}' class='product-img-thumb' data-img-id='{$row['id']}' />";
+        }
+    }else{ echo "No images."; }
+echo "</div>";// set product id
+
+ echo "<div class='col-md-4' id='product-img'>";
+
+    // read all related product image
+    $stmt_product_image = $product_image->readByProductId();
+    $num_product_image = $stmt_product_image->count();
+
+    // if count is more than zero
+    if($num_product_image>0){
+        // loop through all product images
+        $x=0;
+        while ($row = $stmt_product_image->fetch(PDO::FETCH_ASSOC)){
+            // image name and source url
+            $product_image_name = $row['name'];
+            $source="uploads/images/{$product_image_name}";
+            $show_product_img=$x==0 ? "display-block" : "display-none";
+            echo "<a href='{$source}' target='_blank' id='product-img-{$row['id']}' class='product-img {$show_product_img}'>";
+                echo "<img src='{$source}' style='width:100%;' />";
+            echo "</a>";
+            $x++;
+        }
+    }else{ echo "No images."; }
+echo "</div>";
+echo "<div class='col-md-5'>";
+
+    echo "<div class='product-detail'>Price:</div>";
+    echo "<h4 class='m-b-10px price-description'>&#36;" . number_format($product->price, 2, '.', ',') . "</h4>";
+
+    echo "<div class='product-detail'>Product description:</div>";
+    echo "<div class='m-b-10px'>";
+        // make html
+        $page_description = htmlspecialchars_decode(htmlspecialchars_decode($product->description));
+
+        // show to user
+        echo $page_description;
+    echo "</div>";
+
+    echo "<div class='product-detail'>Product category:</div>";
+    echo "<div class='m-b-10px'>{$product->category_name}</div>";
+
+echo "</div>";
+echo "<div class='col-md-2'>";
+    // cart item settings
+    $cart_item->user_id=$_SESSION['username'];; // we default to a user with ID "1" for now
+    $cart_item->product_id=$id;
+
+    // if product was already added in the cart
+    if($cart_item->exists()){
+        echo "<div class='m-b-10px'>This product is already in your cart.</div>";
+        echo "<a href='cart.php' class='btn btn-success w-100-pct'>";
+            echo "Update Cart";
+        echo "</a>";
     }
-    // read all products
-function read($from_record_num, $records_per_page){
 
-    // select all products query
-    $query = "SELECT
-                id, name, description, price
-            FROM
-                " . $this->table_name . "
-            ORDER BY
-                created DESC
-            LIMIT
-                ?, ?";
+    // if product was not added to the cart yet
+    else{
 
-    // prepare query statement
-    $stmt = $this->conn->prepare( $query );
+        echo "<form class='add-to-cart-form'>";
+            // product id
+            echo "<div class='product-id display-none'>{$id}</div>";
 
-    // bind limit clause variables
-    $stmt->bindParam(1, $from_record_num, PDO::PARAM_INT);
-    $stmt->bindParam(2, $records_per_page, PDO::PARAM_INT);
+            // select quantity
+            echo "<div class='m-b-10px f-w-b'>Quantity:</div>";
+            echo "<input type='number' class='form-control m-b-10px cart-quantity' value='1' min='1' />";
 
-    // execute query
-    $stmt->execute();
+            // enable add to cart button
+            echo "<button style='width:100%;' type='submit' class='btn btn-primary add-to-cart m-b-10px'>";
+                echo "<span class='glyphicon glyphicon-shopping-cart'></span> Add to cart";
+            echo "</button>";
 
-    // return values
-    return $stmt;
-}
-
-// used for paging products
-public function count(){
-
-    // query to count all product records
-    $query = "SELECT count(*) FROM " . $this->table_name;
-
-    // prepare query statement
-    $stmt = $this->conn->prepare( $query );
-
-    // execute query
-    $stmt->execute();
-
-    // get row value
-    $rows = $stmt->fetch(PDO::FETCH_NUM);
-
-    // return count
-    return $rows[0];
-}
-// read all product based on product ids included in the $ids variable
-// reference http://stackoverflow.com/a/10722827/827418
-public function readByIds($ids){
-
-    $ids_arr = str_repeat('?,', count($ids) - 1) . '?';
-
-    // query to select products
-    $query = "SELECT id, name, price FROM " . $this->table_name . " WHERE id IN ({$ids_arr}) ORDER BY name";
-
-    // prepare query statement
-    $stmt = $this->conn->prepare($query);
-
-    // execute query
-    $stmt->execute($ids);
-
-    // return values from database
-    return $stmt;
-}
-// used when filling up the update product form
-public function readOne(){
-
-    // query to select single record
-    $query = "SELECT
-                name, description, price
-            FROM
-                " . $this->table_name . "
-            WHERE
-                id = ?
-            LIMIT
-                0,1";
-
-    // prepare query statement
-    $stmt = $this->conn->prepare( $query );
-
-    // sanitize
-    $this->id=htmlspecialchars(strip_tags($this->id));
-
-    // bind product id value
-    $stmt->bindParam(1, $this->id);
-
-    // execute query
-    $stmt->execute();
-
-    // get row values
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // assign retrieved row value to object properties
-    $this->name = $row['name'];
-    $this->description = $row['description'];
-    $this->price = $row['price'];
-}
-}
+        echo "</form>";
+    }
+echo "</div>";
+//include footer for html
+require_once 'layout_foot.php';

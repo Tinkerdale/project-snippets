@@ -1,0 +1,26 @@
+<?php
+session_start();
+// get the product id
+$product_id = isset($_GET['id']) ? $_GET['id'] : "";
+
+// connect to database
+require_once 'config/dbconnection.php';
+
+// include object
+require_once "object/cart_item.php";
+
+// get database connection
+$database = new dbConnect();
+$db = $database->connect();
+
+// initialize objects
+$cart_item = new CartItem($db);
+
+// remove cart item from database
+$cart_item->user_id=$_SESSION['username']; // we default to '1' because we do not have logged in user
+$cart_item->product_id=$product_id;
+$cart_item->delete();
+
+// redirect to product list and tell the user it was added to cart
+header('Location: cart.php?action=removed&id=' . $id);
+?>
