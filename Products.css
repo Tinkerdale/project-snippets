@@ -1,0 +1,24 @@
+body{
+	 color: white; font-weight: bold; font-family: Arial; margin: 25px;
+	border: 1px solid black; 
+}
+ul{
+	margin: 0; list-style-type: none; padding: 0;
+}
+ul li{
+	float: left; width: 220px; height: 45px;
+	background-color: black; opacity: .8; font-size: 25px; line-height: 45px; text-align: center;
+}
+ul li a{
+	text-decoration: none; color: cyan; display: block;
+}
+ul li a:hover{
+	color: green;
+}
+
+ul li ul li{
+	display: none;
+}
+ul li:hover ul li{
+	display: block;
+}
